@@ -387,7 +387,100 @@ elif selected_day == '2일차 : 7월 7일(화)':
                 st.caption("▶️ 재생 버튼을 눌러 결과를 들어보세요.")
 
     with tab_assignment1:
-                st.header('2일차 실습과제1')
+        st.header('2일차 실습과제1')
+        st.subheader("고등학생 진로/학습 AI 챗봇")
+        st.write(
+            "궁금한 진로, 공부법, 고민을 편하게 물어보세요! (Google **Gemini API** 사용 — "
+            "결제수단 등록 없이 무료로 발급받은 키로 바로 테스트할 수 있어요.)"
+        )
+    
+        with st.sidebar:
+            st.markdown("### 🔑 Day5 챗봇 설정 (Gemini)")
+            api_key = st.text_input(
+                "Gemini API Key",
+                type="password",
+                value="",
+                help="https://aistudio.google.com/apikey 에서 Google 계정으로 로그인 후 무료 발급. "
+                    "키는 서버에 저장되지 않고 이 세션에서만 사용됩니다.",
+            )
+            model_name = st.selectbox(
+                "모델 선택",
+                ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
+                help="Flash / Flash-Lite 계열은 무료 티어(RPM/RPD 한도 내)에서 사용할 수 있는 모델입니다.",
+            )
+            persona = st.selectbox(
+                "챗봇 성격 선택",
+                ["친절한 진로상담 선생님", "논리적인 스터디 코치", "유머러스한 친구 같은 챗봇"],
+            )
+            if st.button("Day5 대화 초기화 🔄"):
+                st.session_state.day5_chat_messages = []
+                st.session_state.pop("day5_gemini_chat", None)
+                st.session_state.pop("day5_gemini_chat_key", None)
+                st.rerun()
+    
+        persona_prompts = {
+            "친절한 진로상담 선생님": (
+                "당신은 따뜻하고 친절한 고등학교 진로상담 선생님입니다. "
+                "학생의 눈높이에 맞춰 쉽고 구체적으로, 격려하는 말투로 답변하세요."
+            ),
+            "논리적인 스터디 코치": (
+                "당신은 체계적이고 논리적인 학습 코치입니다. "
+                "학생의 질문에 단계별로, 근거를 들어 명확하게 답변하세요."
+            ),
+            "유머러스한 친구 같은 챗봇": (
+                "당신은 학생과 친구처럼 편하게 대화하는 유쾌한 챗봇입니다. "
+                "가볍고 재미있는 말투를 쓰되, 유용한 정보는 정확히 전달하세요."
+            ),
+        }
+    
+        if "day5_chat_messages" not in st.session_state:
+            st.session_state.day5_chat_messages = []
+    
+        for msg in st.session_state.day5_chat_messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+    
+        prompt = st.chat_input("궁금한 것을 물어보세요!", key="day5_chat_input")
+    
+        if prompt:
+            if not api_key:
+                st.error("먼저 사이드바에 Gemini API Key를 입력해주세요! 🔑 (https://aistudio.google.com/apikey)")
+                st.stop()
+    
+            st.session_state.day5_chat_messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
+    
+            try:
+                from google import genai
+                from google.genai import types
+    
+                # 모델/페르소나가 바뀌면 채팅 세션을 새로 만들고, 그렇지 않으면 기존 세션(대화 맥락)을 재사용
+                chat_key = f"{model_name}::{persona}"
+                if st.session_state.get("day5_gemini_chat_key") != chat_key:
+                    client = genai.Client(api_key=api_key)
+                    st.session_state.day5_gemini_chat = client.chats.create(
+                        model=model_name,
+                        config=types.GenerateContentConfig(
+                            system_instruction=persona_prompts[persona],
+                        ),
+                    )
+                    st.session_state.day5_gemini_chat_key = chat_key
+    
+                chat = st.session_state.day5_gemini_chat
+    
+                with st.chat_message("assistant"):
+                    placeholder = st.empty()
+                    full_response = ""
+                    for chunk in chat.send_message_stream(prompt):
+                        if chunk.text:
+                            full_response += chunk.text
+                            placeholder.markdown(full_response + "▌")
+                    placeholder.markdown(full_response)
+    
+                st.session_state.day5_chat_messages.append({"role": "assistant", "content": full_response})
+            except Exception as e:
+                st.error(f"오류가 발생했어요: {e}")
 
     with tab_assignment2:
                 st.header('2일차 실습과제2')
